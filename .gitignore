@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env
+
+# Node / build
+node_modules/
+dist/
+build/
+
+# Models / large binaries / audio
+models/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+*.wav
+*.mp3
+
+# OS / editor / logs / cache
+.DS_Store
+Thumbs.db
+*.log
+.cache/
+.temp/
