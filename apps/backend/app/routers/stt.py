@@ -1,10 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from faster_whisper import WhisperModel
-import tempfile
-import os
+import tempfile, os
 
 router = APIRouter()
-_model = WhisperModel("base", device="cpu")  # change to "cuda" if you have GPU
+_model = WhisperModel("base", device="cpu")  # "cuda" if you have GPU
 
 @router.post("/api/v1/stt/transcribe")
 async def transcribe(file: UploadFile = File(...), language: str = "en"):
@@ -17,9 +16,7 @@ async def transcribe(file: UploadFile = File(...), language: str = "en"):
     try:
         segments, info = _model.transcribe(tmp_path, language=language)
         text = "".join(seg.text for seg in segments).strip()
-        return {"text": text, "language": info.language, "language_probability": info.language_probability}
+        return {"text": text, "language": info.language, "language_probability": getattr(info, "language_probability", None)}
     finally:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
+        try: os.remove(tmp_path)
+        except OSError: pass

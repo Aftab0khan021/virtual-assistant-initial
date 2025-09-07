@@ -6,10 +6,10 @@ from app.routers.chat_ws import router as chat_ws_router
 from app.routers.stt import router as stt_router
 from app.routers.tts import router as tts_router
 from app.routers.messages import router as messages_router
+import os
 
 app = FastAPI(title="Virtual Assistant API")
 
-# Allow local UI
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173","http://127.0.0.1:5173"],
@@ -20,16 +20,13 @@ app.add_middleware(
 
 @app.on_event("startup")
 def _on_startup():
-    # ensure ./data exists and create tables
-    import os
     os.makedirs("./data", exist_ok=True)
     init_db()
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status":"ok"}
 
-# REST + WS routers
 app.include_router(stt_router)
 app.include_router(tts_router)
 app.include_router(messages_router)

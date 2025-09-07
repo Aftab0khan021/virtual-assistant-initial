@@ -1,9 +1,6 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-import io
-import pyttsx3
-import tempfile
-import os
+import io, pyttsx3, tempfile, os
 
 router = APIRouter()
 
@@ -18,10 +15,7 @@ async def speak(payload: dict):
     try:
         engine.save_to_file(text, out_path)
         engine.runAndWait()
-        audio = open(out_path, "rb")
-        return StreamingResponse(audio, media_type="audio/wav")
+        return StreamingResponse(open(out_path, "rb"), media_type="audio/wav")
     finally:
-        try:
-            os.remove(out_path)
-        except OSError:
-            pass
+        try: os.remove(out_path)
+        except OSError: pass
