@@ -1,15 +1,12 @@
-import requests, os
-
-file_path = os.path.expandvars(r"%USERPROFILE%\Downloads\test.wav")
-url = "http://127.0.0.1:8080/api/v1/stt/transcribe"
-
-if not os.path.exists(file_path):
-    print("File not found:", file_path)
-    raise SystemExit(1)
-
-with open(file_path, "rb") as f:
-    files = {"file": ("test.wav", f, "audio/wav")}
-    r = requests.post(url, files=files, timeout=120)
-
+import os, requests
+p = os.path.expandvars(r"%USERPROFILE%\Downloads\test.wav")
+if not os.path.exists(p):
+    print("File not found:", p); raise SystemExit(1)
+with open(p, "rb") as f:
+    r = requests.post(
+        "http://127.0.0.1:8080/api/v1/stt/transcribe",
+        files={"file": ("test.wav", f, "audio/wav")},
+        timeout=120,
+    )
 print("Status:", r.status_code)
-print("Response:", r.text)
+print("Body:", r.text)
