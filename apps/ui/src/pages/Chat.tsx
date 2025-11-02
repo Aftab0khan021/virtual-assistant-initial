@@ -10,6 +10,12 @@ export default function Chat() {
   const [autoSpeak, setAutoSpeak] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // --- NEW FOR REAL-TIME MIC ---
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  // -----------------------------
+
   useEffect(() => {
     const sid = sessionId();
     fetch(`/api/v1/messages?session_id=${encodeURIComponent(sid)}`)
@@ -27,29 +33,85 @@ export default function Chat() {
     return () => ws.close();
   }, [autoSpeak]);
 
-  function send() {
-    const text = input.trim();
+  // --- MODIFIED send ---
+  // Now accepts an optional text argument to send directly
+  function send(textToSend?: string) {
+    const text = (textToSend || input).trim(); // Use provided text or text from state
     if (!text || !wsRef.current) return;
     wsRef.current.send(text);
     setMessages((m) => [...m, { role: "user", content: text }]);
-    setInput("");
+    setInput(""); // Clear input after sending
   }
 
-  async function uploadAudio(file: File) {
+  // --- MODIFIED uploadAudio ---
+  // Now accepts an 'autoSend' flag
+  async function uploadAudio(file: File, autoSend: boolean = false) {
     const fd = new FormData();
     fd.append("file", file);
+    // Calls the backend STT endpoint
     const res = await fetch("/api/v1/stt/transcribe", { method: "POST", body: fd });
     const json = await res.json();
-    if (json?.text) setInput(json.text);
+    if (json?.text) {
+      setInput(json.text); // Put transcribed text in input box
+      if (autoSend) {
+        send(json.text); // And automatically send it as a chat message
+      }
+    }
   }
 
   async function speakText(text: string) {
+    // Calls the backend TTS endpoint
     const res = await fetch("/api/v1/tts/speak", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
     const blob = await res.blob();
     new Audio(URL.createObjectURL(blob)).play();
+  }
+
+  // --- NEW startRecording ---
+  async function startRecording() {
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" }); // Use webm format
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      // Store audio data as it comes in
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      // When recording stops...
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const audioFile = new File([audioBlob], "recording.webm", { type: "audio/webm" });
+        
+        // ...send the file to our existing uploadAudio function
+        // and set autoSend to true
+        uploadAudio(audioFile, true); 
+        
+        // Clean up microphone stream
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error starting recording:", err);
+      alert("Microphone access denied. Please allow microphone access in your browser settings.");
+    }
+  }
+
+  // --- NEW stopRecording ---
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
   }
 
   return (
@@ -79,12 +141,21 @@ export default function Chat() {
         <input value={input} onChange={(e)=>setInput(e.target.value)}
           onKeyDown={(e)=>e.key==="Enter"&&send()} className="flex-1 border rounded-lg px-3 py-2"
           placeholder="Type a message" />
-        <button onClick={send} className="px-4 py-2 rounded-lg bg-black text-white">Send</button>
-        <label className="px-3 py-2 border rounded-lg cursor-pointer">
-          Mic (upload .wav/.mp3)
-          <input type="file" accept="audio/*" hidden
-            onChange={(e)=>e.target.files?.[0] && uploadAudio(e.target.files[0])}/>
-        </label>
+        <button onClick={() => send()} className="px-4 py-2 rounded-lg bg-black text-white">Send</button>
+        
+        {/* --- REPLACED BUTTON --- */}
+        {/* This is the new "Hold to Speak" button */}
+        <button
+          onMouseDown={startRecording}   // Start on click
+          onMouseUp={stopRecording}      // Stop on release
+          onTouchStart={startRecording}  // For mobile
+          onTouchEnd={stopRecording}     // For mobile
+          className={`px-4 py-2 rounded-lg ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200'}`}
+        >
+          {isRecording ? 'Listening...' : 'Hold to Speak'}
+        </button>
+        {/* --- END OF REPLACEMENT --- */}
+
       </div>
     </div>
   );
